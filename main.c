@@ -3,7 +3,7 @@
 #include <omp.h>
 #include <mpi.h>
 
-int n_samples, n_clusters, curr_nodo, n_nodos, * ind, * temp_ind; 
+int n_samples, n_clusters, n_threads, curr_nodo, n_nodos, * ind, * temp_ind; 
 
 float * samples_x, * samples_y, 
       * centroids_x, * centroids_y, * part_samples_x, * part_samples_y, * temp_centroids_x, * temp_centroids_y;
@@ -54,20 +54,14 @@ float euc_dist(float x1, float y1, float x2, float y2) {
 
 void update_centroids() {
     #pragma omp parallel for num_threads (n_threads) 
-        for(int i=0; i<n_clusters; i++) {
+    for(int i=0; i<n_clusters; i++) {
 
-            centroids_x[i] /= ind[i];
-            centroids_y[i] /= ind[i];
-
-            temp_centroids_x[i] = 0;
-            temp_centroids_y[i] = 0;
-
-            temp_ind[i] = 0;
-        }
+        centroids_x[i] /= ind[i];
+        centroids_y[i] /= ind[i];
+    }
 }
 
 int dist_all_samples(int size) {
-    
     #pragma omp parallel for reduction (+:temp_ind[:n_clusters], temp_centroids_x[:n_clusters], temp_centroids_y[:n_clusters]) num_threads (n_threads) 
     for(int i=0; i < size; i++) {
 
@@ -100,7 +94,8 @@ int main(int argc, char *argv[]) {
 
     n_samples = atoi(argv[1]);
     n_clusters = atoi(argv[2]);
-    
+    n_threads = atoi(argv[3]);
+
     // ALLOC
     alloc();
 
@@ -122,9 +117,16 @@ int main(int argc, char *argv[]) {
         MPI_Reduce(temp_centroids_y, centroids_y, n_clusters, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         MPI_Reduce(temp_ind, ind, n_clusters, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        update_centroids();
-    }
+        if(curr_nodo==0) update_centroids();
 
+        for(int i=0; i<n_clusters; i++) {
+            temp_centroids_x[i] = 0;
+            temp_centroids_y[i] = 0;
+
+            temp_ind[i] = 0;
+        }
+    }
+    
     if(curr_nodo==0) {
         printf("N = %d, K = %d\n", n_samples, n_clusters);
         for(int i=0; i < n_clusters; i++) {
