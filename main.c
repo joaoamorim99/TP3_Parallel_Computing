@@ -22,11 +22,11 @@ void alloc() {
 
     temp_centroids_x = (float *) malloc(n_clusters*sizeof(float));
     temp_centroids_y = (float *) malloc(n_clusters*sizeof(float));
+    
     ind = (int *) malloc(n_clusters*sizeof(int));
-
 }
 
-/*void init() {
+void init() {
     float x=0, y=0;
 
     srand(10); 
@@ -50,13 +50,13 @@ void alloc() {
     MPI_Bcast(&centroids_x, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&centroids_y, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-    MPI_Scatter(&samples_x, (n_samples/n->n_nodos), MPI_FLOAT, n->samples_x, (n_samples/n->n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
-    MPI_Scatter(&samples_y, (n_samples/n->n_nodos), MPI_FLOAT, n->samples_y, (n_samples/n->n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Scatter(&samples_x, (n_samples/n_nodos), MPI_FLOAT, part_samples_x, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Scatter(&samples_y, (n_samples/n_nodos), MPI_FLOAT, part_samples_y, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
 }
 
 
 
-int main(int argc, char *argv[]) {
+/*int main(int argc, char *argv[]) {
     int n_samples, n_clusters;
 
     MPI_Status status;
