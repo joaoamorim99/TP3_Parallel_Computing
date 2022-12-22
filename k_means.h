@@ -7,6 +7,9 @@
 //#include <mpi.h>
 
 typedef struct nodo {
+    int curr_nodo;
+    int n_nodos;
+
     float * samples_x;
     float * samples_y;
     int n_samples;
@@ -14,8 +17,10 @@ typedef struct nodo {
     float * centroids_x;
     float * centroids_y;
     int n_clusters;
-} * Nodo;
 
-void initNodo(Nodo n, int n_samples, int n_clusters);
+    float * temp_centroids_x;
+    float * temp_centroids_y;
+    int * ind;
+} * Nodo;
 
 #endif
