@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <mpi.h>
 
-int n_samples, n_clusters, n_threads, curr_nodo, n_nodos, * ind, * temp_ind; 
+int n_samples, n_clusters, curr_nodo, n_nodos, * ind, * temp_ind; 
 
 float * samples_x, * samples_y, 
       * centroids_x, * centroids_y, * part_samples_x, * part_samples_y, * temp_centroids_x, * temp_centroids_y;
@@ -41,7 +40,6 @@ void generate_samples() {
     } 
 
     // DIFINE FIRST CENTROID
-    #pragma omp parallel for num_threads (n_threads) 
     for(int i = 0; i < n_clusters; i++) { 
         centroids_x[i] = samples_x[i]; //<<cluster_i_coordenada_x>> = <<ponto_i_coordenada_x>> 
         centroids_y[i] = samples_y[i]; //<<cluster_i_coordenada_y>> = <<ponto_i_coordenada_y>>  
@@ -53,7 +51,6 @@ float euc_dist(float x1, float y1, float x2, float y2) {
 }
 
 void update_centroids() {
-    #pragma omp parallel for num_threads (n_threads) 
     for(int i=0; i<n_clusters; i++) {
 
         centroids_x[i] /= ind[i];
@@ -62,7 +59,6 @@ void update_centroids() {
 }
 
 int dist_all_samples(int size) {
-    #pragma omp parallel for reduction (+:temp_ind[:n_clusters], temp_centroids_x[:n_clusters], temp_centroids_y[:n_clusters]) num_threads (n_threads) 
     for(int i=0; i < size; i++) {
 
         int cluster = 0;
@@ -85,6 +81,8 @@ int dist_all_samples(int size) {
     }
 }
 
+//srun --partition=cpar --ntasks=4 perf stat mpirun -np 4 ./k_means 10000000 4
+
 int main(int argc, char *argv[]) {
     int it;
     MPI_Status status;
@@ -94,7 +92,6 @@ int main(int argc, char *argv[]) {
 
     n_samples = atoi(argv[1]);
     n_clusters = atoi(argv[2]);
-    n_threads = atoi(argv[3]);
 
     // ALLOC
     alloc();
@@ -104,12 +101,12 @@ int main(int argc, char *argv[]) {
         generate_samples();
     }
 
+    MPI_Scatter(samples_x, (n_samples/n_nodos), MPI_FLOAT, part_samples_x, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Scatter(samples_y, (n_samples/n_nodos), MPI_FLOAT, part_samples_y, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
+
     for(it=-1; it<20; it++) {
         MPI_Bcast(centroids_x, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
         MPI_Bcast(centroids_y, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
-
-        MPI_Scatter(samples_x, (n_samples/n_nodos), MPI_FLOAT, part_samples_x, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatter(samples_y, (n_samples/n_nodos), MPI_FLOAT, part_samples_y, (n_samples/n_nodos), MPI_FLOAT, 0, MPI_COMM_WORLD);
 
         dist_all_samples((n_samples/n_nodos));
 
@@ -136,5 +133,6 @@ int main(int argc, char *argv[]) {
     }
     
     MPI_Finalize();
-    return it;
+    
+    return 0;
 }
