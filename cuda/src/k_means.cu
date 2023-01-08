@@ -3,17 +3,19 @@
 #define NUM_BLOCKS 128
 #define NUM_THREADS_PER_BLOCK 256
 
-// HOST (?)
-float * samples_x, * samples_y, * centroids_x, * centroids_y, * temp_centroids_x, * temp_centroids_y;
-int n_samples, n_clusters, * temp_ind, * ind;
-
 using namespace std;
 
-/*__device__ float euc_dist(float x1, float y1, float x2, float y2) {
+float * samples_x, * samples_y, * centroids_x, * centroids_y, * temp_centroids_x, * temp_centroids_y;
+int * temp_ind, * ind;
+
+__const__ n_samples, n_clusters;
+
+__device__ float euc_dist(float x1, float y1, float x2, float y2) {
     return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
 }
 
-__global__ void k_meansKernel (float * msamples_x, float * msamples_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind) {
+// KERNEL
+__global__ void dist_all_samples (float * msamples_x, float * msamples_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind) {
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	int cluster = 0;
@@ -36,7 +38,7 @@ __global__ void k_meansKernel (float * msamples_x, float * msamples_y, float * m
 }
 
 
-void launchStencilKernel (float * samples_x, float * samples_y, float * temp_centroids_x, float * temp_centroids_y, int temp_ind) {
+/*void launchStencilKernel (float * samples_x, float * samples_y, float * temp_centroids_x, float * temp_centroids_y, int temp_ind) {
 	float * msamples_x, float * msamples_y, float * mcentroids_x, float * mcentroids_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind;
 	
 	int bytes_samples = n_samples * sizeof(float), bytes_centroids = n_clusters * sizeof(float), bytes_int = n_clusters * sizeof(int);
@@ -101,7 +103,7 @@ void generate_samples() {
 int main( int argc, char** argv) {
 	/*n_samples = argv[1];
 	n_clusters = argv[2];*/
-	n_samples = 10000;
+	n_samples = 100;
 	n_clusters = 4;
 
 	// ALLOC
@@ -110,6 +112,12 @@ int main( int argc, char** argv) {
 
 	centroids_x = (float *) malloc(n_clusters*sizeof(float));
     centroids_y = (float *) malloc(n_clusters*sizeof(float));
+
+	temp_centroids_x = (float *) calloc(n_clusters, sizeof(float));
+    temp_centroids_y = (float *) calloc(n_clusters, sizeof(float));
+    
+    ind = (int *) calloc(n_clusters, sizeof(int));
+    temp_ind = (int *) calloc(n_clusters, sizeof(int));
 
 	// GENERATE SAMPLES
 	generate_samples();
