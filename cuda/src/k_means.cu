@@ -2,23 +2,18 @@
 
 #define NUM_BLOCKS 128
 #define NUM_THREADS_PER_BLOCK 256
-#define SIZE NUM_BLOCKS*NUM_THREADS_PER_BLOCK
 
-int n_samples, n_clusters, curr_nodo, n_nodos, * ind, * temp_ind; 
-
-float * samples_x, * samples_y, 
-      * centroids_x, * centroids_y, * part_samples_x, * part_samples_y, * temp_centroids_x, * temp_centroids_y;
-
+// HOST (?)
+float * samples_x, * samples_y, * centroids_x, * centroids_y, * temp_centroids_x, * temp_centroids_y;
+int n_samples, n_clusters, * temp_ind, * ind;
 
 using namespace std;
 
-__device__ 
-float euc_dist(float x1, float y1, float x2, float y2) {
+/*__device__ float euc_dist(float x1, float y1, float x2, float y2) {
     return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
 }
 
-__global__ 
-void k_meansKernel (float * msamples_x, float * msamples_y, float * mcentroids_x, float * mcentroids_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind) {
+__global__ void k_meansKernel (float * msamples_x, float * msamples_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind) {
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
 	int cluster = 0;
@@ -37,20 +32,17 @@ void k_meansKernel (float * msamples_x, float * msamples_y, float * mcentroids_x
 	mtemp_centroids_x[cluster] += msamples_x[id];
 	mtemp_centroids_y[cluster] += msamples_y[id];
 
-	temp_ind[cluster]++;
-
+	mtemp_ind[cluster]++;
 }
 
 
-void launchStencilKernel (float * samples_x, float * samples_y, float * centroids_x, float * centroids_y, float * temp_centroids_x, float * temp_centroids_y, int temp_ind) {
+void launchStencilKernel (float * samples_x, float * samples_y, float * temp_centroids_x, float * temp_centroids_y, int temp_ind) {
 	float * msamples_x, float * msamples_y, float * mcentroids_x, float * mcentroids_y, float * mtemp_centroids_x, float * mtemp_centroids_y, int * mtemp_ind;
 	
 	int bytes_samples = n_samples * sizeof(float), bytes_centroids = n_clusters * sizeof(float), bytes_int = n_clusters * sizeof(int);
 
 	cudaMalloc ((void**) &msamples_x, bytes_samples);
 	cudaMalloc ((void**) &msamples_y, bytes_samples);
-	cudaMalloc ((void**) &mcentorids_x, bytes_centroids);
-	cudaMalloc ((void**) &mcentroids_y, bytes_centroids);
 	cudaMalloc ((void**) &mtemp_centroids_x, bytes_centroids);
 	cudaMalloc ((void**) &mtemp_centroids_y, bytes_centroids);
 	cudaMalloc ((void**) &mtemp_ind, bytes_int);
@@ -81,19 +73,51 @@ void launchStencilKernel (float * samples_x, float * samples_y, float * centroid
 	cudaFree(da);
 	cudaFree(dc);
 	checkCUDAError("mem free");
+}*/
+
+void generate_samples() {
+    float x=0, y=0;
+
+    srand(10); 
+
+    // CREATING N SAMPLES
+    for(int i = 0; i < n_samples; i++) { 
+        x = (float) rand() / RAND_MAX; 
+        y = (float) rand() / RAND_MAX; 
+
+        samples_x[i] = x;
+        samples_y[i] = y;
+    } 
+
+    // DIFINE FIRST CENTROID
+    for(int i = 0; i < n_clusters; i++) { 
+        centroids_x[i] = samples_x[i]; // <<cluster_i_coordenada_x>> = <<ponto_i_coordenada_x>> 
+        centroids_y[i] = samples_y[i]; // <<cluster_i_coordenada_y>> = <<ponto_i_coordenada_y>>  
+    } 
 }
 
-/*int main( int argc, char** argv) {
-	// arrays on the host
-	float a[SIZE], b[SIZE], c[SIZE];
 
-	// initialises the array
-	for (unsigned i = 0; i < SIZE; ++i)
-		a[i] = (float) rand() / RAND_MAX;
 
-	stencil (a, b);
+int main( int argc, char** argv) {
+	/*n_samples = argv[1];
+	n_clusters = argv[2];*/
+	n_samples = 10000;
+	n_clusters = 4;
+
+	// ALLOC
+	samples_x = (float *) malloc(n_samples*sizeof(float));
+    samples_y = (float *) malloc(n_samples*sizeof(float));
+
+	centroids_x = (float *) malloc(n_clusters*sizeof(float));
+    centroids_y = (float *) malloc(n_clusters*sizeof(float));
+
+	// GENERATE SAMPLES
+	generate_samples();
 	
-	launchStencilKernel (a, c);
+
+	/*stencil (a, b);
+	
+	launchStencilKernel (a, c);*/
 
 	return 0;
-}*/
+}

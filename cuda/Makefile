@@ -5,7 +5,7 @@
 ################################################################################
 
 SHELL = /bin/sh
-BIN_NAME = stencil
+BIN_NAME = kmeans
 
 CXX = nvcc
 LD  = nvcc
