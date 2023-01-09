@@ -2,7 +2,7 @@
 
 #define NUM_BLOCKS 128
 #define NUM_THREADS_PER_BLOCK 256
-
+#define N NUM_BLOCKS*NUM_THREADS_PER_BLOCK 
 using namespace std;
 
 // HOST
@@ -13,21 +13,22 @@ __device__ float euc_dist(float x1, float y1, float x2, float y2) {
     return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
 }
 
-
 // KERNEL
-__global__ void get_cluster(int * mn_clusters, 
+__global__ void k_means(int *mn_samples, int * mn_clusters, 
 							float * msamples_x, float * msamples_y, 
 							float * mcentroids_x, float * mcentroids_y, 
 							float * mtemp_centroids_x,  float * mtemp_centroids_y, 
-							int * mtemp_ind) {
+							int * mtemp_ind, int * mind) {
+	#if __CUDA_ARCH__ >= 200
 
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
+	if(id >= (*mn_samples)) return; 
+	
 	int cluster = 0;
 	float min=1, dist;
 
 	for(int j=0; j < (*mn_clusters); j++) {
-		
 		dist = euc_dist(msamples_x[id], msamples_y[id], mcentroids_x[j], mcentroids_y[j]);
 			
 		if(dist<min) {
@@ -36,27 +37,21 @@ __global__ void get_cluster(int * mn_clusters,
 		}
 	}
 
-	mtemp_centroids_x[cluster] += msamples_x[id];
-	mtemp_centroids_y[cluster] += msamples_y[id];
-
-	mtemp_ind[cluster]++;
-}
-
-__global__ void updateCentroids(int * mn_clusters, 
-								float * mcentroids_x, float * mcentroids_y, 
-								float * mtemp_centroids_x,  float * mtemp_centroids_y, 
-								int * mtemp_ind, int * mind) {
+	atomicAdd(&mtemp_centroids_x[cluster], msamples_x[id]);
+	atomicAdd(&mtemp_centroids_y[cluster], msamples_y[id]);
+	atomicAdd(&mtemp_ind[cluster], 1);
 
 	for(int i=0; i < (*mn_clusters); i++) {
-			mcentroids_x[i] = (mtemp_centroids_x[i] / mtemp_ind[i]);
-            mcentroids_y[i] = (mtemp_centroids_y[i] / mtemp_ind[i]);
+		mcentroids_x[i] = (mtemp_centroids_x[i] / mtemp_ind[i]);
+		mcentroids_y[i] = (mtemp_centroids_y[i] / mtemp_ind[i]);
 
-            mtemp_centroids_x[i] = 0;
-            mtemp_centroids_y[i] = 0;
+		mtemp_centroids_x[i] = 0;
+		mtemp_centroids_y[i] = 0;
 
-            mind[i] = mtemp_ind[i];
-            mtemp_ind[i] = 0;
-        }
+		mind[i] = mtemp_ind[i];
+		mtemp_ind[i] = 0;
+	}
+	#endif
 }
 
 void launchStencilKernel (int n_samples, int n_clusters,
@@ -80,7 +75,7 @@ void launchStencilKernel (int n_samples, int n_clusters,
 	cudaMalloc ((void**) &mtemp_centroids_y, bytes_centroids);
 	cudaMalloc ((void**) &mtemp_ind, bytes_ind);
 	cudaMalloc ((void**) &mind, bytes_ind);
-	//checkCUDAError("mem allocation");
+	checkCUDAError("mem allocation");
 
 	cudaMemcpy (mn_samples, &n_samples, sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy (mn_clusters, &n_clusters, sizeof(int), cudaMemcpyHostToDevice);
@@ -92,14 +87,14 @@ void launchStencilKernel (int n_samples, int n_clusters,
 	cudaMemcpy (mtemp_centroids_y, temp_centroids_y, bytes_centroids, cudaMemcpyHostToDevice);
 	cudaMemcpy (mtemp_ind, temp_ind, bytes_ind, cudaMemcpyHostToDevice);
 	cudaMemcpy (mind, ind, bytes_ind, cudaMemcpyHostToDevice);
-	//checkCUDAError("memcpy h->d");
+	checkCUDAError("memcpy h->d");
 
 	// launch the kernel
 	startKernelTime ();
-	int it;
+	int it, blocks = (N + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
+
 	for(it=0; it<20; it++) {
-		get_cluster <<< NUM_THREADS_PER_BLOCK, NUM_BLOCKS >>> (mn_clusters, msamples_x, msamples_y, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind);
-		updateCentroids <<< NUM_THREADS_PER_BLOCK, NUM_BLOCKS >>> (mn_clusters, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
+		k_means <<< NUM_THREADS_PER_BLOCK, blocks >>> (mn_samples, mn_clusters, msamples_x, msamples_y, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
 	}
 	stopKernelTime ();
 	checkCUDAError("kernel invocation");
@@ -157,8 +152,6 @@ void generate_samples() {
     } 
 }
 
-
-
 int main( int argc, char** argv) {
 	n_samples = atoi(argv[1]);
 	n_clusters = atoi(argv[2]);
@@ -166,16 +159,10 @@ int main( int argc, char** argv) {
 	// ALLOC
 	alloc();
 
-	puts("TESTE\n");
-
 	// GENERATE SAMPLES
 	generate_samples();
-	puts("TESTE1\n");
-
-	//dist_all_samples(a, b);
 	
 	launchStencilKernel (n_samples, n_clusters, samples_x, samples_y, centroids_x, centroids_y, temp_centroids_x, temp_centroids_y, temp_ind, ind);	
-	puts("TESTE2\n");
 	
 	printf("N = %d, K = %d\n", n_samples, n_clusters);
         for(int i=0; i < n_clusters; i++) {
