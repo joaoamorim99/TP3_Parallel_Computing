@@ -1,7 +1,7 @@
 #include "k_means.h"
 
-#define NUM_BLOCKS 128
-#define NUM_THREADS_PER_BLOCK 256
+#define NUM_BLOCKS 1020
+#define NUM_THREADS_PER_BLOCK 1024
 #define N NUM_BLOCKS*NUM_THREADS_PER_BLOCK 
 using namespace std;
 
@@ -19,7 +19,6 @@ __global__ void k_means(int *mn_samples, int * mn_clusters,
 							float * mcentroids_x, float * mcentroids_y, 
 							float * mtemp_centroids_x,  float * mtemp_centroids_y, 
 							int * mtemp_ind, int * mind) {
-	#if __CUDA_ARCH__ >= 200
 
 	int id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -36,12 +35,19 @@ __global__ void k_means(int *mn_samples, int * mn_clusters,
 			cluster = j;
 		}
 	}
-
+	
 	atomicAdd(&mtemp_centroids_x[cluster], msamples_x[id]);
 	atomicAdd(&mtemp_centroids_y[cluster], msamples_y[id]);
 	atomicAdd(&mtemp_ind[cluster], 1);
+}
+
+__global__ void updateCentroids(int *mn_clusters,
+								 float * mcentroids_x, float * mcentroids_y, 
+								 float * mtemp_centroids_x,  float * mtemp_centroids_y, 
+								 int * mtemp_ind, int * mind) {
 
 	for(int i=0; i < (*mn_clusters); i++) {
+		
 		mcentroids_x[i] = (mtemp_centroids_x[i] / mtemp_ind[i]);
 		mcentroids_y[i] = (mtemp_centroids_y[i] / mtemp_ind[i]);
 
@@ -51,7 +57,6 @@ __global__ void k_means(int *mn_samples, int * mn_clusters,
 		mind[i] = mtemp_ind[i];
 		mtemp_ind[i] = 0;
 	}
-	#endif
 }
 
 void launchStencilKernel (int n_samples, int n_clusters,
@@ -93,8 +98,11 @@ void launchStencilKernel (int n_samples, int n_clusters,
 	startKernelTime ();
 	int it, blocks = (N + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
 
+	printf("%d\n", blocks);
+
 	for(it=0; it<20; it++) {
 		k_means <<< NUM_THREADS_PER_BLOCK, blocks >>> (mn_samples, mn_clusters, msamples_x, msamples_y, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
+		updateCentroids <<<n_clusters,1>>> (mn_clusters, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
 	}
 	stopKernelTime ();
 	checkCUDAError("kernel invocation");
