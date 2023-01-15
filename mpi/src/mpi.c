@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         MPI_Bcast(centroids_x, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
         MPI_Bcast(centroids_y, n_clusters, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
-        dist_all_samples((n_samples/n_nodos));
+        dist_all_samples(n_samples/n_nodos);
 
         MPI_Reduce(temp_centroids_x, centroids_x, n_clusters, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         MPI_Reduce(temp_centroids_y, centroids_y, n_clusters, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
