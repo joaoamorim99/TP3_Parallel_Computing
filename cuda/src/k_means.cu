@@ -1,8 +1,9 @@
 #include "k_means.h"
 
-#define NUM_BLOCKS 1020
-#define NUM_THREADS_PER_BLOCK 1024
+#define NUM_BLOCKS 49
+#define NUM_THREADS_PER_BLOCK 2048
 #define N NUM_BLOCKS*NUM_THREADS_PER_BLOCK 
+
 using namespace std;
 
 // HOST
@@ -14,7 +15,7 @@ __device__ float euc_dist(float x1, float y1, float x2, float y2) {
 }
 
 // KERNEL
-__global__ void k_means(int *mn_samples, int * mn_clusters, 
+__global__ void dist_all_samples(int *mn_samples, int * mn_clusters, 
 							float * msamples_x, float * msamples_y, 
 							float * mcentroids_x, float * mcentroids_y, 
 							float * mtemp_centroids_x,  float * mtemp_centroids_y, 
@@ -59,7 +60,7 @@ __global__ void updateCentroids(int *mn_clusters,
 	}
 }
 
-void launchStencilKernel (int n_samples, int n_clusters,
+void launchKernel (int n_samples, int n_clusters,
 						  float * samples_x, float * samples_y, 
 						  float * centroids_x, float * centroids_y, 
 						  float * temp_centroids_x, float * temp_centroids_y, 
@@ -96,13 +97,11 @@ void launchStencilKernel (int n_samples, int n_clusters,
 
 	// launch the kernel
 	startKernelTime ();
-	int it, blocks = (N + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
-
-	printf("%d\n", blocks);
+	int it, blocks1 = (N + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
 
 	for(it=0; it<20; it++) {
-		k_means <<< NUM_THREADS_PER_BLOCK, blocks >>> (mn_samples, mn_clusters, msamples_x, msamples_y, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
-		updateCentroids <<<n_clusters,1>>> (mn_clusters, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
+		dist_all_samples <<< NUM_THREADS_PER_BLOCK, blocks1 >>> (mn_samples, mn_clusters, msamples_x, msamples_y, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
+		updateCentroids <<<1, 1>>> (mn_clusters, mcentroids_x, mcentroids_y, mtemp_centroids_x, mtemp_centroids_y, mtemp_ind, mind);
 	}
 	stopKernelTime ();
 	checkCUDAError("kernel invocation");
@@ -170,7 +169,7 @@ int main( int argc, char** argv) {
 	// GENERATE SAMPLES
 	generate_samples();
 	
-	launchStencilKernel (n_samples, n_clusters, samples_x, samples_y, centroids_x, centroids_y, temp_centroids_x, temp_centroids_y, temp_ind, ind);	
+	launchKernel (n_samples, n_clusters, samples_x, samples_y, centroids_x, centroids_y, temp_centroids_x, temp_centroids_y, temp_ind, ind);	
 	
 	printf("N = %d, K = %d\n", n_samples, n_clusters);
         for(int i=0; i < n_clusters; i++) {

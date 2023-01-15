@@ -5,14 +5,23 @@ INCLUDES = include/
 MPIRUN = mpirun
 EXEC = k_means
 EXEC2 = k_means_omp
+EXEC_PAPI = mpi_papi
+EXEC_PAPI2 = omp_papi
 THREADS = 4
-NPROC = 4
-CFLAGS = -O2 -fopenmp -lm
+NPROC = 3
+CFLAGS = -O2 
+CFLAGS_OMP = -fopenmp -lm
+CFLAGS_PAPI = -O2 -Wall -fno-omit-frame-pointer -g -I/share/apps/papi/5.4.1/include -L/share/apps/papi/5.4.1/lib -lpapi
+CFLAGS_PAPI_OMP = -O2  -fopenmp -lm -Wall -fno-omit-frame-pointer -g -I/share/apps/papi/5.4.1/include -L/share/apps/papi/5.4.1/lib -lpapi
 .DEFAULT_GOAL = k_means
 
-k_means: $(SRC)mpi.c 
+k_means: 
 	$(CC) $(CFLAGS) $(SRC)mpi.c -o $(BIN)$(EXEC)
-	$(CC) $(CFLAGS) $(SRC)mpi.c -o $(BIN)$(EXEC2)
+	$(CC) $(CFLAGS) $(CFLAGS_OMP) $(SRC)omp+mpi.c -o $(BIN)$(EXEC2)
+
+k_means_papi:
+	$(CC) $(CFLAGS_PAPI) $(SRC)mpi_papi.c -o $(BIN)$(EXEC_PAPI)
+	$(CC) $(CFLAGS_PAPI_OMP) $(SRC)omp+mpi_papi.c -o $(BIN)$(EXEC_PAPI2)
 
 clean:
 	rm -r bin/*
@@ -23,15 +32,14 @@ perfmpi:
 perfomp:
 	perf stat -e instructions,cycles -r 5 $(MPIRUN) -np $(NPROC) ./$(BIN)$(EXEC) 10000000 4 $(THREADS)
 
-runseq:	
-	./$(BIN)$(EXEC) 10000000 $(CP_CLUSTERS)
-
-runpar:
-	./$(BIN)$(EXEC) 10000000 $(CP_CLUSTERS) $(THREADS)
-
 runmpi:
-	$(MPIRUN) -np $(NPROC) ./$(BIN)$(EXEC) 10000000 $(CP_CLUSTERS)
+	sbatch mpi.sh
 
 runompmpi:
-	$(MPIRUN) -np $(NPROC) ./$(BIN)$(EXEC) 10000000 $(CP_CLUSTERS) $(THREADS)
+	sbatch omp.sh
 	
+runpapi:
+	sbatch papi.sh
+
+runpapi2:
+	sbatch papi2.sh

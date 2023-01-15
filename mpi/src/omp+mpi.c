@@ -61,7 +61,7 @@ void update_centroids() {
     }
 }
 
-int dist_all_samples(int size) {
+void dist_all_samples(int size) {
     #pragma omp parallel for reduction (+:temp_ind[:n_clusters], temp_centroids_x[:n_clusters], temp_centroids_y[:n_clusters]) num_threads (n_threads) 
     for(int i=0; i < size; i++) {
 

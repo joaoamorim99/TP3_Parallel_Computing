@@ -10,7 +10,8 @@ BIN_NAME = kmeans
 CXX = nvcc
 LD  = nvcc
 
-CXXFLAGS   = -O2 -g -std=c++11 -arch=sm_35 -Wno-deprecated-gpu-targets -ftz=true
+CXXFLAGS   = -O2 -g -std=c++11 -arch=sm_35 -Wno-deprecated-gpu-targets
+
 
 SRC_DIR = src
 BIN_DIR = bin
