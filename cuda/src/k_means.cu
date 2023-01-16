@@ -1,7 +1,7 @@
 #include "k_means.h"
 
-#define NUM_BLOCKS 49
-#define NUM_THREADS_PER_BLOCK 2048
+#define NUM_BLOCKS 1000
+#define NUM_THREADS_PER_BLOCK 10000
 #define N NUM_BLOCKS*NUM_THREADS_PER_BLOCK 
 
 using namespace std;
